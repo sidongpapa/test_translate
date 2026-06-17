@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>번역기</title>
+<style>
+  :root {
+    --bg: #f2f2f7;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.1);
+    --text: #000000;
+    --text2: #6c6c70;
+    --text3: #aeaeb2;
+    --blue: #007AFF;
+    --blue-light: #e8f0fe;
+    --red: #FF3B30;
+    --divider: #c6c6c8;
+    --safe-top: env(safe-area-inset-top, 44px);
+    --safe-bottom: env(safe-area-inset-bottom, 34px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100dvh;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+  }
+
+  /* SETUP */
+  #setup-screen {
+    position: absolute; inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    gap: 20px;
+    padding-top: calc(var(--safe-top) + 32px);
+    padding-bottom: calc(var(--safe-bottom) + 32px);
+    overflow-y: auto;
+  }
+  .setup-title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; text-align: center; }
+  .setup-subtitle { font-size: 14px; color: var(--text2); text-align: center; line-height: 1.5; }
+  .setup-card { background: var(--surface); border-radius: 16px; padding: 20px; width: 100%; display: flex; flex-direction: column; gap: 14px; }
+  .setup-row { display: flex; flex-direction: column; gap: 6px; }
+  .setup-label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+  .setup-input {
+    width: 100%; padding: 12px 14px; font-size: 15px;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); outline: none; font-family: inherit;
+  }
+  .setup-select {
+    flex: 1; padding: 12px 14px; font-size: 15px;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); outline: none; font-family: inherit;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236c6c70' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center;
+  }
+  .lang-row { display: flex; align-items: center; gap: 10px; }
+  .lang-swap {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--blue-light); border: none; color: var(--blue);
+    font-size: 18px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; cursor: pointer;
+  }
+  .btn-primary {
+    width: 100%; padding: 16px; font-size: 17px; font-weight: 600;
+    border-radius: 14px; border: none; background: var(--blue);
+    color: #fff; cursor: pointer; font-family: inherit;
+  }
+  .setup-hint { font-size: 12px; color: var(--text3); text-align: center; line-height: 1.5; }
+  .setup-hint a { color: var(--blue); text-decoration: none; }
+
+  /* APP */
+  #app { display: none; position: absolute; inset: 0; flex-direction: column; }
+  #app.visible { display: flex; }
+
+  .nav-bar {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--divider);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    padding-top: var(--safe-top);
+    height: calc(44px + var(--safe-top));
+    flex-shrink: 0;
+  }
+  .nav-title { font-size: 17px; font-weight: 600; }
+  .nav-action { font-size: 15px; color: var(--blue); background: none; border: none; padding: 4px; cursor: pointer; font-family: inherit; }
+
+  .panels { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+
+  .panel-them {
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+    transform: rotate(180deg); background: var(--bg);
+  }
+  .panel-me {
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+    background: var(--bg);
+  }
+
+  .panel-header {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--divider);
+    padding: 7px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .panel-label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.3px; }
+  .lang-badges { display: flex; gap: 4px; }
+  .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.3px; }
+  .badge-my { background: #cce5ff; color: #004085; }
+  .badge-en { background: #e2e3e5; color: #383d41; }
+  .badge-their { background: #d4edda; color: #155724; }
+
+  .chat-scroll {
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .msg-block { display: flex; flex-direction: column; gap: 3px; }
+  .msg-block.me { align-items: flex-end; }
+  .msg-block.them { align-items: flex-start; }
+  .speaker-name { font-size: 10px; color: var(--text3); padding: 0 4px; margin-bottom: 1px; }
+
+  .bubble {
+    font-size: 15px; line-height: 1.45; padding: 9px 13px;
+    border-radius: 18px; max-width: 80%; word-break: break-word;
+  }
+  .bubble.me { background: #007AFF; color: #fff; border-bottom-right-radius: 4px; }
+  .bubble.them { background: #fff; color: #111; border-bottom-left-radius: 4px; border: 0.5px solid var(--border); }
+
+  .sub-line { font-size: 11px; color: var(--text2); padding: 0 4px; max-width: 80%; line-height: 1.35; }
+  .sub-line.me { text-align: right; }
+  .sub-line.italic { font-style: italic; color: var(--text3); }
+
+  .panel-divider {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 14px; background: #e5e5ea;
+    border-top: 0.5px solid var(--divider);
+    border-bottom: 0.5px solid var(--divider);
+    flex-shrink: 0;
+  }
+  .divider-line { flex: 1; height: 0.5px; background: var(--divider); }
+  .divider-label { font-size: 9px; color: var(--text3); white-space: nowrap; letter-spacing: 0.5px; }
+
+  .input-bar {
+    background: var(--surface);
+    border-top: 0.5px solid var(--divider);
+    padding: 8px 12px;
+    padding-bottom: calc(8px + var(--safe-bottom));
+    display: flex; gap: 8px; align-items: flex-end;
+    flex-shrink: 0;
+  }
+  .text-field {
+    flex: 1; padding: 9px 14px; font-size: 15px;
+    border-radius: 20px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text);
+    outline: none; font-family: inherit;
+    resize: none; max-height: 100px; line-height: 1.4;
+  }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: var(--bg); color: var(--text2); font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .icon-btn.send { background: var(--blue); color: #fff; }
+  .icon-btn.recording { background: var(--red); color: #fff; }
+
+  .empty-hint { text-align: center; color: var(--text3); font-size: 13px; padding: 24px 0; }
+
+  .dot-loader { display: flex; gap: 4px; padding: 10px 4px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); animation: bounce 1.2s infinite; }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
+
+  .mic-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65); z-index: 100;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 20px;
+  }
+  .mic-overlay.visible { display: flex; }
+  .mic-circle {
+    width: 100px; height: 100px; border-radius: 50%;
+    background: var(--red); display: flex; align-items: center;
+    justify-content: center; font-size: 44px;
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+  .mic-hint { color: #fff; font-size: 16px; }
+  .mic-lang { color: rgba(255,255,255,0.7); font-size: 13px; }
+  .mic-stop {
+    padding: 12px 28px; border-radius: 24px; background: #fff;
+    color: var(--red); border: none; font-size: 16px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+
+  .mode-toggle {
+    display: flex; background: var(--bg); border-radius: 8px; padding: 2px;
+  }
+  .mode-btn {
+    flex: 1; padding: 6px 10px; border: none; border-radius: 6px;
+    font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;
+    background: transparent; color: var(--text2);
+  }
+  .mode-btn.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+
+<div id="setup-screen">
+  <div>
+    <div class="setup-title">🌍 번역기</div>
+    <div class="setup-subtitle" style="margin-top:8px;">실시간 대화 번역 앱</div>
+  </div>
+
+  <div class="setup-card">
+    <div class="setup-row">
+      <div class="setup-label">Gemini API 키</div>
+      <input class="setup-input" id="api-key-input" type="password" placeholder="AIza..." autocomplete="off" spellcheck="false">
+    </div>
+    <div class="setup-row">
+      <div class="setup-label">언어 설정</div>
+      <div class="lang-row">
+        <select class="setup-select" id="my-lang">
+          <option value="ko">🇰🇷 한국어</option>
+          <option value="ja">🇯🇵 일본어</option>
+          <option value="zh">🇨🇳 중국어</option>
+          <option value="es">🇪🇸 스페인어</option>
+          <option value="fr">🇫🇷 프랑스어</option>
+          <option value="it">🇮🇹 이탈리아어</option>
+          <option value="en">🇺🇸 영어</option>
+        </select>
+        <button class="lang-swap" onclick="swapLangs()">⇄</button>
+        <select class="setup-select" id="their-lang">
+          <option value="de">🇩🇪 독일어</option>
+          <option value="en">🇺🇸 영어</option>
+          <option value="fr">🇫🇷 프랑스어</option>
+          <option value="es">🇪🇸 스페인어</option>
+          <option value="it">🇮🇹 이탈리아어</option>
+          <option value="ja">🇯🇵 일본어</option>
+          <option value="zh">🇨🇳 중국어</option>
+          <option value="ko">🇰🇷 한국어</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="startApp()">시작하기</button>
+
+  <div class="setup-hint">
+    Gemini API 키는 <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>에서 무료로 발급받을 수 있어요.
+  </div>
+</div>
+
+<div id="app">
+  <div class="nav-bar">
+    <button class="nav-action" onclick="goSetup()">설정</button>
+    <span class="nav-title" id="nav-title">번역기</span>
+    <button class="nav-action" onclick="clearChat()">지우기</button>
+  </div>
+
+  <div class="panels">
+    <!-- 상대방 화면 (180도 회전) -->
+    <div class="panel-them">
+      <div class="panel-header">
+        <span class="panel-label">상대방 화면</span>
+        <div class="lang-badges">
+          <span class="badge badge-their" id="badge-their">DE</span>
+          <span class="badge badge-en">EN</span>
+        </div>
+      </div>
+      <div class="chat-scroll" id="chat-them">
+        <div class="empty-hint">대화가 시작되면 여기에 표시됩니다</div>
+      </div>
+    </div>
+
+    <div class="panel-divider">
+      <div class="divider-line"></div>
+      <span class="divider-label">── 화면 구분 ──</span>
+      <div class="divider-line"></div>
+    </div>
+
+    <!-- 내 화면 -->
+    <div class="panel-me">
+      <div class="panel-header">
+        <span class="panel-label">내 화면</span>
+        <div class="lang-badges">
+          <span class="badge badge-my" id="badge-my">KO</span>
+          <span class="badge badge-en">EN</span>
+          <span class="badge badge-their" id="badge-their2">DE</span>
+        </div>
+      </div>
+      <div class="chat-scroll" id="chat-me">
+        <div class="empty-hint">대화가 시작되면 여기에 표시됩니다</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 입력바 -->
+  <div class="input-bar">
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="mode-me" onclick="setMode('me')">나</button>
+      <button class="mode-btn" id="mode-them" onclick="setMode('them')">상대방</button>
+    </div>
+    <textarea class="text-field" id="text-input" placeholder="입력하세요..." rows="1"
+      oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+    <button class="icon-btn" id="mic-btn" onclick="startMic()">🎤</button>
+    <button class="icon-btn" id="tts-btn" onclick="speakLast()">🔊</button>
+    <button class="icon-btn send" onclick="sendMessage()">↑</button>
+  </div>
+</div>
+
+<div class="mic-overlay" id="mic-overlay">
+  <div class="mic-circle">🎤</div>
+  <div class="mic-hint">말씀하세요...</div>
+  <div class="mic-lang" id="mic-lang-hint"></div>
+  <button class="mic-stop" onclick="stopMic()">완료</button>
+</div>
+
+<script>
+  const LANG_NAMES = {
+    ko:'한국어', de:'독일어', en:'영어', ja:'일본어',
+    zh:'중국어', es:'스페인어', fr:'프랑스어', it:'이탈리아어'
+  };
+  const LANG_CODES = {
+    ko:'Korean', de:'German', en:'English', ja:'Japanese',
+    zh:'Chinese', es:'Spanish', fr:'French', it:'Italian'
+  };
+  const SPEECH_LANG = {
+    ko:'ko-KR', de:'de-DE', en:'en-US', ja:'ja-JP',
+    zh:'zh-CN', es:'es-ES', fr:'fr-FR', it:'it-IT'
+  };
+  const VOICE_LANG = {
+    ko:'ko-KR', de:'de-DE', en:'en-US', ja:'ja-JP',
+    zh:'zh-CN', es:'es-ES', fr:'fr-FR', it:'it-IT'
+  };
+
+  let apiKey = '';
+  let myLang = 'ko';
+  let theirLang = 'de';
+  let messages = [];
+  let inputMode = 'me'; // 'me' or 'them'
+  let recognition = null;
+  let isRecording = false;
+  let lastTheirText = '';
+
+  function swapLangs() {
+    const a = document.getElementById('my-lang');
+    const b = document.getElementById('their-lang');
+    const tmp = a.value; a.value = b.value; b.value = tmp;
+  }
+
+  function startApp() {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (!key) { alert('Gemini API 키를 입력해주세요.'); return; }
+    apiKey = key;
+    myLang = document.getElementById('my-lang').value;
+    theirLang = document.getElementById('their-lang').value;
+
+    const myName = LANG_NAMES[myLang];
+    const theirName = LANG_NAMES[theirLang];
+
+    document.getElementById('nav-title').textContent = `${myName} ⇄ ${theirName}`;
+    document.getElementById('badge-my').textContent = myLang.toUpperCase();
+    document.getElementById('badge-their').textContent = theirLang.toUpperCase();
+    document.getElementById('badge-their2').textContent = theirLang.toUpperCase();
+    document.getElementById('mode-me').textContent = `나 (${myName})`;
+    document.getElementById('mode-them').textContent = `상대방 (${theirName})`;
+
+    try { localStorage.setItem('gemini_key', key); localStorage.setItem('my_lang', myLang); localStorage.setItem('their_lang', theirLang); } catch(e) {}
+
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    setMode('me');
+  }
+
+  function goSetup() {
+    document.getElementById('app').classList.remove('visible');
+    document.getElementById('setup-screen').style.display = 'flex';
+  }
+
+  // 저장된 값 불러오기
+  try {
+    const k = localStorage.getItem('gemini_key');
+    const ml = localStorage.getItem('my_lang');
+    const tl = localStorage.getItem('their_lang');
+    if (k) document.getElementById('api-key-input').value = k;
+    if (ml) document.getElementById('my-lang').value = ml;
+    if (tl) document.getElementById('their-lang').value = tl;
+  } catch(e) {}
+
+  // ── GEMINI TRANSLATE ──
+  async function translate(text, fromLang, toLang) {
+    if (fromLang === toLang) return text;
+
+    const fromName = LANG_CODES[fromLang];
+    const toName = LANG_CODES[toLang];
+    const prompt = `Translate the following ${fromName} text to ${toName}. Return ONLY the translated text, nothing else.\n\n${text}`;
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 500 }
+        })
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API 오류 ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.candidates[0].content.parts[0].text.trim();
+  }
+
+  // ── MODE ──
+  function setMode(mode) {
+    inputMode = mode;
+    document.getElementById('mode-me').classList.toggle('active', mode === 'me');
+    document.getElementById('mode-them').classList.toggle('active', mode === 'them');
+
+    const myName = LANG_NAMES[myLang];
+    const theirName = LANG_NAMES[theirLang];
+    document.getElementById('text-input').placeholder =
+      mode === 'me' ? `${myName}로 입력하세요...` : `${theirName}로 입력하세요...`;
+  }
+
+  // ── SEND ──
+  async function sendMessage() {
+    const input = document.getElementById('text-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    autoResize(input);
+
+    if (inputMode === 'me') {
+      await handleMyMessage(text);
+    } else {
+      await handleTheirMessage(text);
+    }
+  }
+
+  async function handleMyMessage(text) {
+    const loaderId = showLoader('me');
+    try {
+      const [theirText, enText] = await Promise.all([
+        translate(text, myLang, theirLang),
+        myLang === 'en' ? Promise.resolve(text) : translate(text, myLang, 'en')
+      ]);
+      lastTheirText = theirText;
+      removeLoader(loaderId);
+      addMessage({ speaker: 'me', original: text, english: enText, their: theirText });
+    } catch(e) {
+      removeLoader(loaderId);
+      alert('번역 오류: ' + e.message);
+    }
+  }
+
+  async function handleTheirMessage(text) {
+    const loaderId = showLoader('them');
+    try {
+      const [myText, enText] = await Promise.all([
+        translate(text, theirLang, myLang),
+        theirLang === 'en' ? Promise.resolve(text) : translate(text, theirLang, 'en')
+      ]);
+      removeLoader(loaderId);
+      addMessage({ speaker: 'them', original: text, english: enText, mine: myText });
+    } catch(e) {
+      removeLoader(loaderId);
+      alert('번역 오류: ' + e.message);
+    }
+  }
+
+  // ── RENDER ──
+  function addMessage(msg) {
+    messages.push(msg);
+    renderMessages();
+  }
+
+  function renderMessages() {
+    const chatMe = document.getElementById('chat-me');
+    const chatThem = document.getElementById('chat-them');
+    chatMe.innerHTML = '';
+    chatThem.innerHTML = '';
+
+    if (messages.length === 0) {
+      chatMe.innerHTML = '<div class="empty-hint">대화가 시작되면 여기에 표시됩니다</div>';
+      chatThem.innerHTML = '<div class="empty-hint">대화가 시작되면 여기에 표시됩니다</div>';
+      return;
+    }
+
+    messages.forEach(msg => {
+      if (msg.speaker === 'me') {
+        // 내 화면: 나 / 내언어(bubble) + EN + 상대방언어(이탤릭)
+        chatMe.appendChild(createBlock('me', '나', msg.original, msg.english, msg.their));
+        // 상대방 화면: 상대방 시점에서 나 = "나(Ich)" / 상대방언어(bubble) + EN
+        chatThem.appendChild(createBlock('me', '나', msg.their, msg.english, null));
+      } else {
+        // 내 화면: 상대방 / 내언어(bubble) + EN
+        chatMe.appendChild(createBlock('them', '상대방', msg.mine, msg.english, null));
+        // 상대방 화면: 상대방 시점에서 상대방 = "나" / 상대방언어(bubble) + EN
+        chatThem.appendChild(createBlock('them', '상대방', msg.original, msg.english, null));
+      }
+    });
+
+    chatMe.scrollTop = chatMe.scrollHeight;
+    chatThem.scrollTop = 0; // rotated
+  }
+
+  function createBlock(side, label, primary, secondary, tertiary) {
+    const block = document.createElement('div');
+    block.className = `msg-block ${side}`;
+    let html = `<span class="speaker-name">${esc(label)}</span>`;
+    html += `<div class="bubble ${side}">${esc(primary)}</div>`;
+    if (secondary) html += `<div class="sub-line ${side}">${esc(secondary)}</div>`;
+    if (tertiary) html += `<div class="sub-line ${side} italic">${esc(tertiary)}</div>`;
+    block.innerHTML = html;
+    return block;
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── LOADER ──
+  let loaderCount = 0;
+  function showLoader(side) {
+    const id = 'loader-' + (++loaderCount);
+    const chat = document.getElementById(side === 'me' ? 'chat-me' : 'chat-them');
+    const el = document.createElement('div');
+    el.id = id;
+    el.className = `msg-block ${side}`;
+    el.innerHTML = `<div class="dot-loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+    chat.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+    return id;
+  }
+
+  function removeLoader(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  // ── MIC ──
+  function startMic() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert('Chrome 브라우저에서 사용해주세요.'); return; }
+
+    recognition = new SR();
+    recognition.lang = inputMode === 'me' ? SPEECH_LANG[myLang] : SPEECH_LANG[theirLang];
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    document.getElementById('mic-lang-hint').textContent =
+      inputMode === 'me' ? LANG_NAMES[myLang] : LANG_NAMES[theirLang];
+
+    recognition.onresult = (e) => {
+      const text = e.results[0][0].transcript;
+      stopMic();
+      if (inputMode === 'me') handleMyMessage(text);
+      else handleTheirMessage(text);
+    };
+
+    recognition.onerror = (e) => {
+      stopMic();
+      if (e.error !== 'aborted') alert('음성 인식 오류: ' + e.error);
+    };
+
+    recognition.onend = () => { if (isRecording) stopMic(); };
+    recognition.start();
+    isRecording = true;
+    document.getElementById('mic-overlay').classList.add('visible');
+    document.getElementById('mic-btn').classList.add('recording');
+  }
+
+  function stopMic() {
+    if (recognition) { try { recognition.stop(); } catch(e) {} recognition = null; }
+    isRecording = false;
+    document.getElementById('mic-overlay').classList.remove('visible');
+    document.getElementById('mic-btn').classList.remove('recording');
+  }
+
+  // ── TTS ──
+  function speakLast() {
+    if (!lastTheirText) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(lastTheirText);
+    utter.lang = VOICE_LANG[theirLang] || 'de-DE';
+    utter.rate = 0.9;
+    window.speechSynthesis.speak(utter);
+  }
+
+  // ── HELPERS ──
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  function clearChat() {
+    if (!messages.length) return;
+    if (confirm('대화 내용을 모두 지울까요?')) {
+      messages = [];
+      lastTheirText = '';
+      renderMessages();
+    }
+  }
+</script>
+</body>
+</html>
